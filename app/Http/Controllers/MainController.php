@@ -11,32 +11,34 @@ class MainController extends Controller
     
     public function getIndex()
     {
-        $employees = [];
-        $tmp_employees = DB::table('fact_absensi')->select('id_pegawai')->distinct()->orderBy('id_pegawai')->get();
-        foreach($tmp_employees as $employee){
-            $emp = DB::table('dim_pegawai')->select('nama_pegawai')->where('id_pegawai', $employee->id_pegawai)->first();
-            $employees[] = [
-                'id_pegawai' => $employee->id_pegawai,
-                'nama_pegawai' => $emp->nama_pegawai,
-            ];
+        $data = [];
+        $target = [];
+        $pencapaian = [];
+        foreach(DB::table('dim_waktu')->get() as $waktu){
+            $select = DB::table('fact_income')->groupBy('id_waktu')
+                                              ->select(DB::raw('SUM(nominal) as pencapaian, SUM(target) as target'))
+                                              ->having('id_waktu', '=', $waktu->id_waktu)
+                                              ->first();
+            $target[] = $select->target / 1000;
+            $pencapaian[] = $select->pencapaian / 1000;
         }
-        $employees = array_values(array_sort($employees, function ($value) {
-            return $value['nama_pegawai'];
-        }));
-        $employees = json_decode(json_encode($employees));
+        $data[] = [
+            'name' => 'Target',
+            'data' => $target
+        ];
+        $data[] = [
+            'name' => 'Pencapaian',
+            'data' => $pencapaian
+        ];
         
         $months = [];
         $tmp_times = DB::table('dim_waktu')->get();
         foreach($tmp_times as $time){
             $date = DateTime::createFromFormat('d-n-Y', '01-'.$time->bulan.'-'.$time->tahun);
-            $months[] = [
-                'id_waktu' => $time->id_waktu,
-                'bulan' => $date->format('F Y'),
-            ];
+            $months[] = $date->format('M Y');
         }
-        $months = json_decode(json_encode($months));
         
-        return view('index')->with(compact(['employees', 'months']));
+        return view('index')->with(compact(['data', 'months']));
     }
     
     public function getAbsensi()
